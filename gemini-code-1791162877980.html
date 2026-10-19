@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ngontrol.in - Kanz Pro v3</title>
+    
+    <!-- Chart.js & Tailwind -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <!-- TensorFlow.js & Teachable Machine Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <style>
+        :root { --theme: #2563eb; }
+        * { transition: background-color 0.3s, border-color 0.3s, color 0.3s; font-family: 'Inter', sans-serif; }
+        body { background: #F7F9FB; overflow: hidden; }
+        
+        .sidebar-btn.active { background: #f3f4f6; border-right: 4px solid var(--theme); color: var(--theme); }
+        .page { display: none; animation: fadeIn 0.4s ease; height: calc(100vh - 80px); overflow-y: auto; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Dark Mode */
+        body.dark { background: #0f172a; color: #f8fafc; }
+        .dark aside, .dark header, .dark .bg-white, .dark #right-panel { background: #1e293b !important; border-color: #334155 !important; }
+        .dark input, .dark select { background: #334155 !important; border-color: #475569 !important; color: #fff; }
+        .dark .sidebar-btn.active { background: #334155; }
+        .dark #dev-card { background: #0f172a !important; border: 1px solid #334155 !important; }
+
+        /* Custom Switch */
+        .sw-box { width: 70px; height: 36px; background: #e2e8f0; border-radius: 99px; position: relative; cursor: pointer; display: flex; align-items: center; transition: all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55); box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+        .sw-dot { width: 28px; height: 28px; background: white; border-radius: 50%; position: absolute; left: 4px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: #94a3b8; transition: all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55); font-size: 12px; }
+        .sw-active { background: var(--theme); box-shadow: 0 0 15px var(--theme); }
+        .sw-active .sw-dot { transform: translateX(34px); color: var(--theme); }
+
+        /* Custom Range Slider */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: var(--theme); cursor: pointer; margin-top: -8px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #cbd5e1; border-radius: 99px; }
+        .dark input[type=range]::-webkit-slider-runnable-track { background: #475569; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        
+        #toast { position: fixed; bottom: 20px; right: 20px; transform: translateY(100px); transition: 0.5s; z-index: 1000; }
+        
+        /* Fix for Webcam Canvas to be rounded */
+        #webcam-container canvas { border-radius: 0.75rem; object-fit: cover; }
+    </style>
+</head>
+<body class="flex h-screen">
+
+    <aside class="w-64 bg-white border-r flex flex-col p-6 z-50">
+        <div class="flex items-center gap-3 mb-10">
+            <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                <i class="fas fa-bolt text-xl"></i>
+            </div>
+            <span class="font-extrabold text-xl tracking-tight">Ngontrol<span class="text-blue-600">.in</span></span>
+        </div>
+        <nav class="flex-1 space-y-2">
+            <button onclick="window.showPage('dash')" id="nav-dash" class="sidebar-btn active w-full flex items-center gap-3 p-3 rounded-xl text-gray-500 font-medium text-sm">
+                <i class="fas fa-th-large"></i> Dashboard
+            </button>
+            <button onclick="window.showPage('build')" id="nav-build" class="sidebar-btn w-full flex items-center gap-3 p-3 rounded-xl text-gray-500 font-medium text-sm">
+                <i class="fas fa-tools"></i> Builder
+            </button>
+            <button onclick="window.showPage('ctrl')" id="nav-ctrl" class="sidebar-btn w-full flex items-center gap-3 p-3 rounded-xl text-gray-500 font-medium text-sm">
+                <i class="fas fa-gamepad"></i> BT Controller
+            </button>
+            <!-- NEW MENU AI VISION -->
+            <button onclick="window.showPage('vision')" id="nav-vision" class="sidebar-btn w-full flex items-center gap-3 p-3 rounded-xl text-gray-500 font-medium text-sm">
+                <i class="fas fa-camera"></i> AI Vision
+            </button>
+            <button onclick="window.showPage('help')" id="nav-help" class="sidebar-btn w-full flex items-center gap-3 p-3 rounded-xl text-gray-500 font-medium text-sm">
+                <i class="fas fa-question-circle"></i> Help Center
+            </button>
+            <button onclick="window.showPage('set')" id="nav-set" class="sidebar-btn w-full flex items-center gap-3 p-3 rounded-xl text-gray-500 font-medium text-sm">
+                <i class="fas fa-cog"></i> Settings
+            </button>
+        </nav>
+
+        <div id="dev-card" class="mt-auto bg-[#1e293b] p-5 rounded-2xl shadow-xl border border-gray-700">
+            <p class="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">Developer</p>
+            <p class="text-xs font-bold text-white mb-2">Kanz Rajabana</p>
+            <div class="space-y-1.5">
+                <a href="https://www.instagram.com/kanzrajabanaal" target="_blank" class="flex items-center gap-1.5 text-blue-400 text-[10px] font-bold hover:text-white transition-colors">
+                    <i class="fab fa-instagram text-xs"></i> kanzrajabanaal
+                </a>
+                <a href="mailto:rajabanakanz@gmail.com" class="flex items-center gap-1.5 text-gray-400 text-[10px] font-bold hover:text-white transition-colors">
+                    <i class="fas fa-envelope text-xs"></i> rajabanakanz@gmail.com
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative overflow-hidden">
+        <header class="h-20 bg-white border-b px-8 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-4 w-full justify-between">
+                <div class="flex gap-3">
+                    <div id="status-bt" class="px-3 py-1 rounded-full bg-gray-100 dark:bg-slate-800 text-[10px] font-bold text-gray-400 border dark:border-slate-700 italic">BT: OFFLINE</div>
+                    <div id="status-fb" class="px-3 py-1 rounded-full bg-gray-100 dark:bg-slate-800 text-[10px] font-bold text-gray-400 border dark:border-slate-700 italic">FB: OFFLINE</div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <div class="flex flex-col gap-1">
+                        <div class="flex gap-1">
+                            <input type="password" id="fb-key" placeholder="Firebase API Key" class="text-[10px] p-2 bg-gray-50 border rounded-lg w-32">
+                            <input type="text" id="fb-url" placeholder="Database URL" class="text-[10px] p-2 bg-gray-50 border rounded-lg w-32">
+                        </div>
+                        <input type="text" id="fb-path" placeholder="Path (contoh: iot/kelas8)" value="iot/kelas8" class="text-[10px] p-2 bg-gray-50 border rounded-lg w-full">
+                    </div>
+                    <button id="btn-conn-fb" class="bg-black dark:bg-blue-600 text-white px-4 py-2 rounded-lg text-[10px] font-bold hover:scale-105 active:scale-95 shadow-md">SYNC FB</button>
+                    
+                    <div class="h-8 w-px bg-gray-300 mx-2"></div>
+
+                    <button id="btn-conn-bt" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-[10px] font-bold hover:scale-105 active:scale-95 shadow-md flex items-center gap-2">
+                        <i class="fab fa-bluetooth"></i> MICRO:BIT
+                    </button>
+                    <button id="btn-dis-bt" disabled class="text-red-500 hover:text-red-700 px-2 disabled:opacity-30"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 flex overflow-hidden">
+            <div class="flex-1 overflow-y-auto p-8 relative">
+                
+                <section id="page-dash" class="page active">
+                    <div class="flex justify-between items-end mb-8">
+                        <div>
+                            <h1 class="text-2xl font-black">Control Center</h1>
+                            <p class="text-gray-400 text-sm">Manage your IoT devices in real-time.</p>
+                        </div>
+                        <div class="text-right">
+                            <p id="live-clock" class="text-xl font-bold font-mono">00:00:00</p>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">WIB TIME</p>
+                        </div>
+                    </div>
+                    <div id="widgets-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="col-span-full text-center text-gray-400 text-sm mt-10">Koneksikan ke Firebase untuk memuat widget, atau hubungkan Micro:bit.</div>
+                    </div>
+                </section>
+
+                <!-- NEW SECTION: AI VISION -->
+                <section id="page-vision" class="page">
+                    <h2 class="text-xl font-bold mb-6">Teachable Machine Detection</h2>
+                    <div class="bg-white dark:bg-slate-800 p-6 rounded-3xl border dark:border-slate-700 shadow-sm max-w-xl space-y-4 relative">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Masukkan link model Teachable Machine Anda untuk memulai klasifikasi gambar secara real-time.</p>
+                        
+                        <input type="text" id="tm-url" placeholder="URL Model (contoh: https://teachablemachine.withgoogle.com/models/xxx/)" class="w-full p-3 border rounded-xl text-sm bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                        
+                        <div class="flex gap-3">
+                            <button id="btn-start-vision" onclick="window.startVision()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold text-xs shadow-lg hover:bg-blue-700 transition-colors">START CAMERA</button>
+                            <button id="btn-stop-vision" onclick="window.stopVision()" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-bold text-xs shadow-lg hover:bg-red-600 hidden transition-colors">STOP CAMERA</button>
+                        </div>
+
+                        <!-- Vision Automation Options -->
+                        <div class="mt-4 p-4 bg-blue-50 dark:bg-slate-700/50 rounded-xl border border-blue-100 dark:border-slate-600 flex justify-between items-center">
+                            <div>
+                                <h4 class="text-xs font-bold text-blue-800 dark:text-blue-300">Kirim Hasil Otomatis</h4>
+                                <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Kirim deteksi (>85%) ke DB (path: "vision") / Micro:bit</p>
+                            </div>
+                            <div class="sw-box" id="sw-auto-send" onclick="this.classList.toggle('sw-active')">
+                                <div class="sw-dot"><i class="fas fa-paper-plane"></i></div>
+                            </div>
+                        </div>
+
+                        <div id="webcam-container" class="flex justify-center mt-6 overflow-hidden rounded-xl bg-gray-100 dark:bg-slate-900 border dark:border-slate-700 h-[250px] items-center">
+                            <span class="text-gray-400 text-xs font-bold"><i class="fas fa-video-slash mb-2 text-xl block text-center"></i> Kamera Offline</span>
+                        </div>
+                        
+                        <div id="label-container" class="mt-4 flex flex-col gap-3"></div>
+                    </div>
+                </section>
+
+                <section id="page-build" class="page">
+                    <h2 class="text-xl font-bold mb-6">Widget Builder</h2>
+                    <div class="bg-white p-6 rounded-3xl border shadow-sm max-w-xl space-y-4">
+                        <input type="text" id="w-key" placeholder="Nama Key / Device (ex: lampu_teras)" class="w-full p-3 border rounded-xl text-sm bg-gray-50">
+                        
+                        <select id="w-type" onchange="window.toggleBuilderFields()" class="w-full p-3 border rounded-xl text-sm bg-gray-50">
+                            <option value="sensor">Chart Sensor (Analog)</option>
+                            <option value="switch">Toggle Switch (0/1)</option>
+                            <option value="dimmer">Dimmer Slider (0-1024)</option>
+                            <option value="button">Custom Button (Ikon Aksi)</option>
+                        </select>
+
+                        <!-- Field untuk Sensor/Dimmer -->
+                        <div id="field-sensor-dimmer" class="flex gap-3 transition-all">
+                            <input type="text" id="w-unit" placeholder="Satuan (ex: °C)" class="flex-1 p-3 border rounded-xl text-sm bg-gray-50">
+                            <input type="number" id="w-max" placeholder="Batas Maks (ex: 100)" class="flex-1 p-3 border rounded-xl text-sm bg-gray-50">
+                        </div>
+
+                        <!-- Field Khusus Button (Awalnya Sembunyi) -->
+                        <div id="field-button" class="hidden flex gap-3 transition-all">
+                            <select id="w-icon" class="flex-1 p-3 border rounded-xl text-sm bg-gray-50">
+                                <option value="fa-arrow-up">Panah Atas</option>
+                                <option value="fa-arrow-down">Panah Bawah</option>
+                                <option value="fa-arrow-left">Panah Kiri</option>
+                                <option value="fa-arrow-right">Panah Kanan</option>
+                                <option value="fa-circle">Lingkaran</option>
+                            </select>
+                            <input type="text" id="w-btn-val" placeholder="Data dikirim (ex: maju)" class="flex-1 p-3 border rounded-xl text-sm bg-gray-50">
+                        </div>
+                        
+                        <button id="btn-save-param" class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-3 rounded-xl font-bold text-xs shadow-lg mt-4">SIMPAN WIDGET</button>
+                    </div>
+                </section>
+
+                <section id="page-ctrl" class="page">
+                    <h2 class="text-xl font-bold mb-2">Bluetooth Controller</h2>
+                    <p class="text-gray-400 text-sm mb-10">Tahan tombol untuk mengirim arah, lepas untuk mengirim data "stop".</p>
+                    
+                    <div class="flex items-center justify-center mt-10">
+                        <div class="grid grid-cols-3 gap-6 bg-white dark:bg-slate-800 p-10 rounded-full shadow-lg border dark:border-slate-700 select-none">
+                            <div></div>
+                            <!-- Tombol Atas -->
+                            <button id="bt-up" class="w-20 h-20 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center text-3xl shadow-sm hover:bg-blue-100 hover:text-blue-600 active:bg-blue-600 active:text-white dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 transition-all"><i class="fas fa-chevron-up"></i></button>
+                            <div></div>
+                            
+                            <!-- Tombol Kiri -->
+                            <button id="bt-left" class="w-20 h-20 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center text-3xl shadow-sm hover:bg-blue-100 hover:text-blue-600 active:bg-blue-600 active:text-white dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 transition-all"><i class="fas fa-chevron-left"></i></button>
+                            
+                            <!-- Center Indicator -->
+                            <div class="w-20 h-20 flex items-center justify-center">
+                                <div class="w-6 h-6 bg-blue-500 rounded-full shadow-inner opacity-50"></div>
+                            </div>
+                            
+                            <!-- Tombol Kanan -->
+                            <button id="bt-right" class="w-20 h-20 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center text-3xl shadow-sm hover:bg-blue-100 hover:text-blue-600 active:bg-blue-600 active:text-white dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 transition-all"><i class="fas fa-chevron-right"></i></button>
+                            
+                            <div></div>
+                            <!-- Tombol Bawah -->
+                            <button id="bt-down" class="w-20 h-20 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center text-3xl shadow-sm hover:bg-blue-100 hover:text-blue-600 active:bg-blue-600 active:text-white dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 transition-all"><i class="fas fa-chevron-down"></i></button>
+                            <div></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="page-help" class="page">
+                    <h2 class="text-xl font-bold mb-6">Help & Documentation</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-white p-6 rounded-3xl border flex gap-4 shadow-sm">
+                             <div class="text-blue-600 text-3xl mt-1"><i class="fas fa-database"></i></div>
+                             <div>
+                                 <h3 class="font-bold mb-1 text-sm">Firebase Realtime DB</h3>
+                                 <p class="text-[11px] text-gray-500 leading-relaxed">Masukkan API Key dan URL DB Anda di Header. Widgets otomatis tersinkronisasi jika data berubah.</p>
+                             </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border flex gap-4 shadow-sm">
+                            <div class="text-blue-600 text-3xl mt-1"><i class="fas fa-bluetooth"></i></div>
+                            <div>
+                                <h3 class="font-bold mb-1 text-sm">Micro:bit Auto-Discovery</h3>
+                                <p class="text-[11px] text-gray-500 leading-relaxed">Hubungkan Micro:bit via Bluetooth. Jika mengirim data serial "suhu: 25", Widget otomatis dibuat.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="page-set" class="page">
+                    <h2 class="text-xl font-bold mb-6">System Settings</h2>
+                    <div class="max-w-md space-y-4">
+                        <div class="bg-white p-6 rounded-3xl border flex items-center justify-between shadow-sm">
+                            <span class="font-bold text-sm">Dark Mode</span>
+                            <button onclick="window.toggleDark()" class="px-4 py-2 bg-gray-100 dark:bg-slate-700 rounded-lg text-xs font-bold">Toggle Theme</button>
+                        </div>
+                        <div class="bg-white p-6 rounded-3xl border shadow-sm">
+                            <p class="font-bold text-sm mb-4">Branding Color</p>
+                            <input type="color" oninput="window.changeTheme(this.value)" id="color-pick" value="#2563eb" class="w-full h-10 rounded-lg cursor-pointer bg-transparent border-none">
+                        </div>
+                        <button onclick="window.resetApp()" class="w-full p-4 bg-red-50 dark:bg-red-900/30 text-red-500 rounded-2xl text-xs font-bold">RESET CREDENTIALS</button>
+                    </div>
+                </section>
+
+            </div>
+
+            <div id="right-panel" class="w-80 border-l bg-white p-6 hidden xl:flex flex-col gap-6 relative z-10">
+                <div>
+                    <h3 class="font-bold text-sm mb-4 italic dark:text-slate-300">System Activity</h3>
+                    <div class="space-y-3" id="log-panel">
+                        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl dark:bg-slate-800 border dark:border-slate-700">
+                            <div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs"><i class="fas fa-check"></i></div>
+                            <div>
+                                <p class="text-[10px] font-bold dark:text-slate-100">System Ready</p>
+                                <p class="text-[9px] text-gray-400 dark:text-slate-400">Waiting for connection...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast" class="bg-black text-white px-6 py-3 rounded-2xl text-xs font-bold shadow-2xl flex items-center gap-2">
+        <i class="fas fa-info-circle text-blue-400"></i> <span id="toast-msg">Ready!</span>
+    </div>
+
+    <script type="module">
+        import { initializeApp, getApps, deleteApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getDatabase, ref, onValue, update, remove, set } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+
+        const UART_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+        const UART_TX_CHARACTERISTIC_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+        const UART_RX_CHARACTERISTIC_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+
+        const state = {
+            db: null, currentPath: "", unsubscribe: null, currentData: {}, historyData: {}, charts: {},
+            device: null, txChar: null, rxChar: null, bleConnected: false, bleBuffer: "",
+            // Vision State
+            visionModel: null, visionWebcam: null, isVisionRunning: false, maxPredictions: 0, lastSentClass: ""
+        };
+
+        const $ = (id) => document.getElementById(id);
+        const formatName = (str) => str.replace(/_/g, ' ').toUpperCase();
+
+        window.showPage = (id) => {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+            $('page-'+id).classList.add('active');
+            $('nav-'+id).classList.add('active');
+        };
+
+        window.toggleDark = () => {
+            document.body.classList.toggle('dark');
+            localStorage.setItem('iot_dark', document.body.classList.contains('dark'));
+        };
+
+        window.changeTheme = (c) => {
+            document.documentElement.style.setProperty('--theme', c);
+            localStorage.setItem('iot_theme', c);
+        };
+
+        window.resetApp = () => {
+            localStorage.removeItem('ngontrol_cfg');
+            location.reload();
+        }
+
+        window.toggleBuilderFields = () => {
+            const type = $('w-type').value;
+            if (type === 'button') {
+                $('field-sensor-dimmer').classList.add('hidden');
+                $('field-button').classList.remove('hidden');
+            } else {
+                $('field-sensor-dimmer').classList.remove('hidden');
+                $('field-button').classList.add('hidden');
+            }
+        };
+
+        function showToast(msg) {
+            const t = $('toast'); $('toast-msg').innerText = msg;
+            t.style.transform = "translateY(0)";
+            setTimeout(() => t.style.transform = "translateY(100px)", 3000);
+        }
+
+        function logActivity(icon, colorClass, title, desc) {
+            const panel = $('log-panel');
+            const html = `
+                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl dark:bg-slate-800 border dark:border-slate-700 animate-[fadeIn_0.3s_ease]">
+                    <div class="w-8 h-8 rounded-full ${colorClass} flex items-center justify-center text-xs"><i class="${icon}"></i></div>
+                    <div>
+                        <p class="text-[10px] font-bold dark:text-slate-100">${title}</p>
+                        <p class="text-[9px] text-gray-400 dark:text-slate-400">${desc}</p>
+                    </div>
+                </div>
+            `;
+            panel.insertAdjacentHTML('afterbegin', html);
+            if(panel.children.length > 5) panel.lastElementChild.remove();
+        }
+
+        setInterval(() => $('live-clock').innerText = new Date().toLocaleTimeString('id-ID'), 1000);
+
+        // --- BLUETOOTH MICRO:BIT LOGIC ---
+        $('btn-conn-bt').onclick = async () => {
+            try {
+                if (!navigator.bluetooth) throw new Error("Bluetooth tidak didukung.");
+                
+                state.device = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: "BBC micro:bit" }],
+                    optionalServices: [UART_SERVICE_UUID]
+                });
+                
+                state.device.addEventListener("gattserverdisconnected", () => {
+                    state.bleConnected = false; updateBLEUI(); 
+                    logActivity("fas fa-times", "bg-red-100 text-red-600", "BT Disconnected", "Micro:bit terputus.");
+                });
+
+                const server = await state.device.gatt.connect();
+                const service = await server.getPrimaryService(UART_SERVICE_UUID);
+                state.txChar = await service.getCharacteristic(UART_TX_CHARACTERISTIC_UUID);
+                state.rxChar = await service.getCharacteristic(UART_RX_CHARACTERISTIC_UUID);
+                
+                await state.txChar.startNotifications();
+                state.txChar.addEventListener("characteristicvaluechanged", handleBLEData);
+                
+                state.bleConnected = true; updateBLEUI();
+                showToast("Micro:bit Connected!");
+                logActivity("fab fa-bluetooth", "bg-blue-100 text-blue-600", "Bluetooth Active", "Terhubung ke Micro:bit");
+            } catch (e) { showToast("Gagal konek BLE"); }
+        };
+
+        $('btn-dis-bt').onclick = () => { if(state.device) state.device.gatt.disconnect(); };
+
+        function updateBLEUI() {
+            $('btn-conn-bt').disabled = state.bleConnected;
+            $('btn-dis-bt').disabled = !state.bleConnected;
+            const status = $('status-bt');
+            if (state.bleConnected) {
+                status.className = "px-3 py-1 rounded-full bg-blue-500 text-[10px] font-bold text-white border-none";
+                status.innerText = "BT: ONLINE";
+            } else {
+                status.className = "px-3 py-1 rounded-full bg-gray-100 dark:bg-slate-800 text-[10px] font-bold text-gray-400 border dark:border-slate-700 italic";
+                status.innerText = "BT: OFFLINE";
+            }
+        }
+
+        function handleBLEData(event) {
+            let arr = [];
+            for (let i = 0; i < event.target.value.byteLength; i++) arr.push(event.target.value.getUint8(i));
+            state.bleBuffer += String.fromCharCode.apply(null, arr);
+            
+            const lines = state.bleBuffer.split('\n');
+            state.bleBuffer = lines.pop(); 
+            
+            lines.forEach(line => {
+                const txt = line.trim();
+                if (txt) processAutoDiscovery(txt);
+            });
+        }
+
+        function processAutoDiscovery(txt) {
+            if (!state.db) return;
+            if (txt.includes(':')) {
+                const parts = txt.split(':');
+                let key = parts[0].trim().replace(/\s+/g, '_').toLowerCase();
+                const val = parseFloat(parts[1].trim());
+
+                if (key === "mode") key = "otomatis"; 
+                let autoType = "sensor"; 
+                if (key === "lampu" || key === "otomatis") autoType = "switch"; 
+                if (key === "kipas") autoType = "dimmer"; 
+
+                if (!isNaN(val)) {
+                    if (state.currentData[key]) {
+                        update(ref(state.db, `${state.currentPath}/${key}`), { value: val });
+                    } else {
+                        logActivity("fas fa-magic", "bg-purple-100 text-purple-600", "Auto-Discovery", `Buat widget: ${key}`);
+                        set(ref(state.db, `${state.currentPath}/${key}`), { 
+                            tipe: autoType, value: val, satuan: "", batas_atas: autoType==="dimmer"?1024:100 
+                        });
+                    }
+                }
+            }
+        }
+
+        async function sendToMicrobit(key, val) {
+            if (!state.rxChar) {
+                if(val === undefined) return;
+                return;
+            }
+            
+            let payload = "";
+            if (val === undefined) {
+                payload = `${key}\n`;
+            } else {
+                let microbitKey = key;
+                if (key === "otomatis") microbitKey = "mode";
+                payload = `${microbitKey},${val}\n`;
+            }
+
+            try {
+                await state.rxChar.writeValue(new TextEncoder().encode(payload));
+                if (key !== 'stop') {
+                    logActivity("fas fa-paper-plane", "bg-blue-100 text-blue-600", "Data Sent", `TX: ${payload.trim()}`);
+                }
+            } catch(e) { }
+        }
+
+        const setupBTController = () => {
+            const directions = [
+                { id: 'bt-up', val: 'atas' }, { id: 'bt-down', val: 'bawah' },
+                { id: 'bt-left', val: 'kiri' }, { id: 'bt-right', val: 'kanan' }
+            ];
+
+            directions.forEach(dir => {
+                const btn = $(dir.id);
+                if(!btn) return;
+                const press = (e) => { e.preventDefault(); sendToMicrobit(dir.val); };
+                const release = (e) => { e.preventDefault(); sendToMicrobit('stop'); };
+                btn.addEventListener('mousedown', press);
+                btn.addEventListener('touchstart', press, {passive: false});
+                btn.addEventListener('mouseup', release);
+                btn.addEventListener('mouseleave', release);
+                btn.addEventListener('touchend', release);
+            });
+        };
+
+        // --- FIREBASE LOGIC ---
+        $('btn-conn-fb').onclick = async () => {
+            const apiKey = $('fb-key').value.trim();
+            const dbUrl = $('fb-url').value.trim();
+            const path = $('fb-path').value.trim();
+
+            if(!apiKey || !dbUrl || !path) { showToast("Lengkapi semua kolom Firebase!"); return; }
+            
+            try {
+                const config = { apiKey, databaseURL: dbUrl, projectId: dbUrl.split('//')[1]?.split('.')[0] };
+                const apps = getApps();
+                if (apps.length > 0) await deleteApp(apps[0]);
+                if (state.unsubscribe) state.unsubscribe();
+
+                const app = initializeApp(config);
+                state.db = getDatabase(app);
+                state.currentPath = path;
+                
+                state.unsubscribe = onValue(ref(state.db, path), (snapshot) => {
+                    state.currentData = snapshot.val() || {};
+                    renderDashboard(state.currentData);
+                    
+                    const el = $('status-fb');
+                    el.className = "px-3 py-1 rounded-full bg-green-500 text-[10px] font-bold text-white border-none";
+                    el.innerText = "FB: SYNCED";
+                });
+
+                localStorage.setItem('ngontrol_cfg', JSON.stringify({apiKey, dbUrl, path}));
+                showToast("Terhubung ke Firebase!");
+                logActivity("fas fa-database", "bg-green-100 text-green-600", "Cloud Sync Active", "Listening to " + path);
+            } catch(e) { showToast("Firebase Error!"); }
+        };
+
+        function renderDashboard(data) {
+            const grid = $('widgets-grid');
+            const keys = Object.keys(data).filter(k => k !== 'vision'); // Sembunyikan parameter internal dari widget grid
+            
+            if(keys.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center text-gray-400 text-sm mt-10">Database Kosong. Buat widget di Builder.</div>`;
+                return;
+            }
+            if(grid.innerHTML.includes("Kosong") || grid.innerHTML.includes("Koneksikan")) grid.innerHTML = '';
+
+            Array.from(grid.children).forEach(card => {
+                const id = card.id.replace('card-', '');
+                if(!keys.includes(id)) {
+                    card.remove();
+                    if(state.charts[id]) { state.charts[id].destroy(); delete state.charts[id]; }
+                }
+            });
+
+            keys.forEach(key => {
+                const item = data[key];
+                let card = $(`card-${key}`);
+
+                if(!state.historyData[key]) state.historyData[key] = [];
+                state.historyData[key].push(item.value);
+                if(state.historyData[key].length > 20) state.historyData[key].shift();
+
+                if(!card) {
+                    const isSensor = item.tipe === 'sensor';
+                    const isSwitch = item.tipe === 'switch';
+                    const isBtn = item.tipe === 'button';
+                    
+                    let icon = isSensor ? 'fa-chart-area' : (isSwitch ? 'fa-power-off' : 'fa-sliders-h');
+                    if (isBtn) icon = 'fa-dot-circle';
+                    
+                    let color = isSensor ? 'text-blue-500' : (isSwitch ? 'text-orange-500' : 'text-purple-500');
+                    if (isBtn) color = 'text-green-500';
+
+                    card = document.createElement('div');
+                    card.id = `card-${key}`;
+                    card.className = "bg-white dark:bg-slate-800 p-6 rounded-3xl border dark:border-slate-700 shadow-sm relative group hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col";
+                    
+                    grid.appendChild(card);
+
+                    const contentHTML = `
+                        <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="window.deleteParam('${key}')" class="text-red-300 hover:text-red-500 text-xs bg-white dark:bg-slate-700 rounded-lg p-2 shadow-sm"><i class="fas fa-trash"></i></button>
+                        </div>
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center ${color} text-lg shadow-inner"><i class="fas ${icon}"></i></div>
+                            <h3 class="font-extrabold uppercase text-[11px] tracking-widest text-slate-400">${formatName(key)}</h3>
+                        </div>
+                        <div id="content-${key}" class="flex flex-col flex-1 justify-center"></div>
+                    `;
+                    card.innerHTML = contentHTML;
+
+                    const content = card.querySelector(`#content-${key}`);
+
+                    if(item.tipe === 'sensor') {
+                        content.innerHTML = `
+                            <div class="flex items-baseline gap-1 mb-2">
+                                <div class="text-4xl font-black val-display dark:text-white">${item.value}</div>
+                                <div class="text-xs font-bold text-gray-400">${item.satuan || ''}</div>
+                            </div>
+                            <div class="w-full h-[60px]"><canvas id="canvas-${key}"></canvas></div>
+                        `;
+                        const ctx = $(`canvas-${key}`).getContext('2d');
+                        state.charts[key] = new Chart(ctx, {
+                            type: 'line',
+                            data: { labels: Array(20).fill(''), datasets: [{ data: [], borderColor: 'var(--theme)', tension: 0.4, pointRadius: 0, fill: true, backgroundColor: 'rgba(37, 99, 235, 0.1)' }] },
+                            options: { plugins: { legend: false }, scales: { x: { display: false }, y: { display: false, min:0, max: item.batas_atas||100 } }, maintainAspectRatio: false }
+                        });
+                    } 
+                    else if(item.tipe === 'switch') {
+                        const isOn = (item.value == 1 || item.value === true);
+                        let labelStatus = isOn ? 'ON' : 'OFF';
+                        if (key === 'otomatis') labelStatus = isOn ? 'AUTO' : 'MANUAL';
+
+                        content.innerHTML = `
+                            <div class="sw-box mx-auto mt-2 ${isOn ? 'sw-active' : ''}" onclick="window.toggleSwitch('${key}')">
+                                <div class="sw-dot"><i class="fas fa-power-off"></i></div>
+                            </div>
+                            <div class="text-center text-xs font-bold mt-4 status-text ${isOn ? 'text-blue-500' : 'text-gray-400'}">${labelStatus}</div>
+                        `;
+                    }
+                    else if(item.tipe === 'dimmer') {
+                        content.innerHTML = `
+                            <div class="flex justify-between w-full mb-2 items-end">
+                                <div class="text-3xl font-black val-display dark:text-white">${item.value}</div>
+                                <div class="text-[10px] font-bold text-gray-400 mb-1">Max: ${item.batas_atas||1024}</div>
+                            </div>
+                            <input type="range" min="0" max="${item.batas_atas||1024}" value="${item.value}" class="w-full mt-4" onchange="window.changeDimmer('${key}', this.value)" oninput="this.previousElementSibling.firstElementChild.innerText = this.value">
+                        `;
+                    }
+                    else if(item.tipe === 'button') {
+                        const iconBtn = item.icon || 'fa-circle';
+                        content.innerHTML = `
+                            <div class="flex justify-center mt-2">
+                                <button onmousedown="window.pressCustomBtn('${key}', '${item.btn_val}')" onmouseup="window.releaseCustomBtn('${key}')" onmouseleave="window.releaseCustomBtn('${key}')" ontouchstart="window.pressCustomBtn('${key}', '${item.btn_val}'); event.preventDefault()" ontouchend="window.releaseCustomBtn('${key}')" class="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl shadow-sm hover:bg-blue-100 active:bg-blue-600 active:text-white dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 transition-colors select-none">
+                                    <i class="fas ${iconBtn}"></i>
+                                </button>
+                            </div>
+                            <div class="text-center text-[10px] font-bold mt-4 text-gray-400">Tahan: <span class="text-blue-500">${item.btn_val}</span></div>
+                        `;
+                    }
+                }
+
+                if(item.tipe === 'sensor') {
+                    card.querySelector('.val-display').innerText = item.value;
+                    if(state.charts[key]) {
+                        state.charts[key].data.datasets[0].data = state.historyData[key];
+                        state.charts[key].update('none');
+                    }
+                } 
+                else if(item.tipe === 'switch') {
+                    const swBox = card.querySelector('.sw-box');
+                    const isOn = (item.value == 1 || item.value === true);
+                    isOn ? swBox.classList.add('sw-active') : swBox.classList.remove('sw-active');
+                    let labelStatus = isOn ? 'ON' : 'OFF';
+                    if (key === 'otomatis') labelStatus = isOn ? 'AUTO' : 'MANUAL';
+                    card.querySelector('.status-text').innerText = labelStatus;
+                    card.querySelector('.status-text').className = `text-center text-xs font-bold mt-4 status-text ${isOn ? 'text-blue-500' : 'text-gray-400'}`;
+                }
+                else if(item.tipe === 'dimmer') {
+                    card.querySelector('.val-display').innerText = item.value;
+                    card.querySelector('input[type=range]').value = item.value;
+                }
+            });
+        }
+
+        window.toggleSwitch = async (key) => {
+            let currentVal = state.currentData[key].value;
+            let newVal = (currentVal == 1 || currentVal === true) ? 0 : 1;
+            await update(ref(state.db, `${state.currentPath}/${key}`), { value: newVal });
+            sendToMicrobit(key, newVal);
+        };
+
+        window.changeDimmer = async (key, val) => {
+            await update(ref(state.db, `${state.currentPath}/${key}`), { value: parseInt(val) });
+            sendToMicrobit(key, parseInt(val));
+        };
+        
+        window.pressCustomBtn = (key, val) => {
+            sendToMicrobit(key, val);
+            if(state.db) update(ref(state.db, `${state.currentPath}/${key}`), { value: val });
+        };
+        
+        window.releaseCustomBtn = (key) => {
+            sendToMicrobit(key, 'stop');
+            if(state.db) update(ref(state.db, `${state.currentPath}/${key}`), { value: 'stop' });
+        };
+
+        window.deleteParam = async (key) => {
+            if(confirm(`Hapus widget [${formatName(key)}]?`)) {
+                await remove(ref(state.db, `${state.currentPath}/${key}`));
+                if(state.historyData[key]) delete state.historyData[key];
+                showToast("Widget dihapus.");
+            }
+        };
+
+        $('btn-save-param').onclick = async () => {
+            if(!state.db) { showToast("Koneksikan ke Firebase dulu!"); return; }
+            let key = $('w-key').value.trim().replace(/\s+/g, '_').toLowerCase();
+            if(!key) return;
+
+            const tipe = $('w-type').value;
+            const payload = { tipe: tipe, value: 0 };
+
+            if (tipe === 'sensor' || tipe === 'dimmer') {
+                payload.satuan = $('w-unit').value.trim();
+                payload.batas_atas = parseInt($('w-max').value) || (tipe === 'dimmer' ? 1024 : 100);
+            } else if (tipe === 'button') {
+                payload.icon = $('w-icon').value;
+                payload.btn_val = $('w-btn-val').value.trim() || 'aktif';
+                payload.value = 'stop';
+            }
+
+            try {
+                await set(ref(state.db, `${state.currentPath}/${key}`), payload);
+                showToast("Widget tersimpan!");
+                $('w-key').value = '';$('w-unit').value = ''; $('w-max').value = '';$('w-btn-val').value = '';
+                window.showPage('dash');
+            } catch(e) { showToast("Gagal menyimpan!"); }
+        };
+
+
+        // --- AI VISION LOGIC (TEACHABLE MACHINE) ---
+        window.startVision = async () => {
+            let url = $('tm-url').value.trim();
+            if(!url) { showToast("Masukkan link model terlebih dahulu!"); return; }
+            if(!url.endsWith('/')) url += '/';
+
+            $('btn-start-vision').classList.add('hidden');
+            $('btn-stop-vision').classList.remove('hidden');$('webcam-container').innerHTML = '<span class="text-blue-500 text-xs font-bold"><i class="fas fa-spinner fa-spin mr-2"></i> Loading Model AI...</span>';
+
+            const modelURL = url + "model.json";
+            const metadataURL = url + "metadata.json";
+
+            try {
+                // Pastikan tfjs dan tmImage sudah termuat via script
+                state.visionModel = await tmImage.load(modelURL, metadataURL);
+                state.maxPredictions = state.visionModel.getTotalClasses();
+
+                const flip = true; 
+                state.visionWebcam = new tmImage.Webcam(250, 250, flip);
+                await state.visionWebcam.setup();
+                await state.visionWebcam.play();
+                state.isVisionRunning = true;
+                
+                window.requestAnimationFrame(visionLoop);
+
+                $('webcam-container').innerHTML = '';$('webcam-container').appendChild(state.visionWebcam.canvas);
+                
+                showToast("Kamera AI aktif!");
+                logActivity("fas fa-camera", "bg-purple-100 text-purple-600", "AI Vision", "Kamera dan Model Teachable Machine berjalan.");
+            } catch(e) {
+                showToast("Gagal memuat model. Periksa link!");
+                window.stopVision();
+            }
+        };
+
+        window.stopVision = () => {
+            state.isVisionRunning = false;
+            if(state.visionWebcam) {
+                state.visionWebcam.stop();
+            }
+            $('btn-start-vision').classList.remove('hidden');
+            $('btn-stop-vision').classList.add('hidden');$('webcam-container').innerHTML = '<span class="text-gray-400 text-xs font-bold"><i class="fas fa-video-slash mb-2 text-xl block text-center"></i> Kamera Offline</span>';
+            $('label-container').innerHTML = '';
+            logActivity("fas fa-camera", "bg-gray-100 text-gray-500", "AI Vision", "Kamera dimatikan.");
+        };
+
+        async function visionLoop() {
+            if(!state.isVisionRunning) return;
+            state.visionWebcam.update(); 
+            await predictVision();
+            window.requestAnimationFrame(visionLoop);
+        }
+
+        async function predictVision() {
+            if(!state.visionModel) return;
+            const prediction = await state.visionModel.predict(state.visionWebcam.canvas);
+            
+            let htmlStr = "";
+            let highestProb = 0;
+            let detectedClass = "";
+
+            for (let i = 0; i < state.maxPredictions; i++) {
+                const className = prediction[i].className;
+                const prob = prediction[i].probability;
+                const probPercent = (prob * 100).toFixed(0);
+                
+                if (prob > highestProb) {
+                    highestProb = prob;
+                    detectedClass = className;
+                }
+
+                htmlStr += `
+                    <div class="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border dark:border-slate-600">
+                        <div class="flex justify-between w-full mb-1 text-xs">
+                            <span class="dark:text-slate-200 uppercase tracking-widest font-bold">${className}</span>
+                            <span class="${probPercent > 80 ? 'text-blue-500 font-black' : 'text-gray-500'}">${probPercent}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-1.5">
+                            <div class="bg-blue-600 h-1.5 rounded-full transition-all duration-100" style="width: ${probPercent}%"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            $('label-container').innerHTML = htmlStr;
+
+            // Fitur Ekstra: Kirim otomatis hasil deteksi tertinggi (>85%) ke hardware / DB
+            const isAutoSend = $('sw-auto-send').classList.contains('sw-active');
+            if (isAutoSend && highestProb > 0.85 && state.lastSentClass !== detectedClass) {
+                state.lastSentClass = detectedClass;
+                const safeClassData = detectedClass.toLowerCase().replace(/\s+/g, '_');
+                
+                if (state.db) {
+                    update(ref(state.db, `${state.currentPath}/vision`), { value: safeClassData });
+                }
+                
+                sendToMicrobit('vision', safeClassData);
+                logActivity("fas fa-eye", "bg-blue-100 text-blue-600", "Vision Trigger", `Terdeteksi: ${detectedClass}`);
+            }
+        }
+
+        // --- INIT ---
+        window.onload = () => {
+            if(localStorage.getItem('iot_dark') === 'true') document.body.classList.add('dark');
+            if(localStorage.getItem('iot_theme')) document.documentElement.style.setProperty('--theme', localStorage.getItem('iot_theme'));
+            $('color-pick').value = getComputedStyle(document.documentElement).getPropertyValue('--theme').trim() || "#2563eb";
+
+            const saved = JSON.parse(localStorage.getItem('ngontrol_cfg') || '{}');
+            if(saved.apiKey) {
+                $('fb-key').value = saved.apiKey;
+                $('fb-url').value = saved.dbUrl;
+                $('fb-path').value = saved.path || "iot/kelas8";
+            }
+            
+            setupBTController();
+        };
+    </script>
+</body>
+</html>
